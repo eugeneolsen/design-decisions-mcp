@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "decision-memory": {
+      "type": "stdio",
+      "command": ".\\.venv\\Scripts\\python.exe",
+      "args": ["mcp_decisions_llm.py"]
+    }
+  }
+}
