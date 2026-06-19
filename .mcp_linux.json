@@ -2,8 +2,8 @@
   "mcpServers": {
     "decision-memory": {
       "type": "stdio",
-      "command": "./.venv/bin/python",
-      "args": ["mcp_decisions_llm.py"]
+      "command": "uv",
+      "args": ["run", "python", "mcp-decisions-llm.py"]
     }
   }
 }
