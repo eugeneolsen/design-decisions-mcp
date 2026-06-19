@@ -1,0 +1,45 @@
+id: DDR-0000
+type: design
+title: Use Immutable Decision Record Payloads in MCP Responses
+date: "2026-06-19"
+status: accepted
+
+meta:
+  tags:
+    - mcp-server
+    - design-pattern
+    - immutability
+
+context: >
+  The MCP server loads decision records at runtime and returns them to
+  clients. Payloads must be consistent across multiple calls to the same
+  decision ID to avoid confusing AI assistants with stale or conflicting
+  information. When a record is fetched, the returned YAML dump should
+  represent the exact file-system state without in-memory mutations or
+  caching side effects.
+
+decision:
+  chosen_option: Return yaml.dump() of the raw parsed YAML without mutation
+  justification: >
+    Parsing YAML once and dumping it directly ensures the response
+    reflects the authoritative file state. This avoids the risk of
+    in-memory transformations (e.g., renaming fields, filtering tags)
+    causing divergence between what the validator approved and what
+    the AI harness sees.
+
+consequences:
+  enforced_constraints:
+    - "Do NOT mutate record payloads before returning them in
+      fetch_architecture_decision."
+    - "Do use yaml.dump() with default_flow_style=False to preserve
+      readability."
+
+  classified_consequences:
+    - impact: good
+      description: >
+        The AI harness always sees the exact record that passed validation,
+        eliminating hidden discrepancies.
+    - impact: neutral
+      description: >
+        If a record's YAML syntax is updated on disk, clients may see
+        different payloads on subsequent calls — expected and correct.

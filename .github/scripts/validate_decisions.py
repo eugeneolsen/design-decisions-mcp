@@ -6,6 +6,9 @@ import sys
 import jsonschema
 import yaml
 
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
+
 TYPE_DIRS = {"adr", "ddr", "sdr", "odr", "tdr", "pdr"}
 SCHEMA_PATH = os.path.join("docs", "decision-record-schema.json")
 

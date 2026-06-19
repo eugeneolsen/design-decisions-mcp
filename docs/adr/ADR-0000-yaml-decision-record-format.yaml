@@ -1,0 +1,64 @@
+id: ADR-0000
+type: architecture
+title: Use Pure YAML as the Universal Decision Record Format
+date: "2026-06-19"
+status: accepted
+
+meta:
+  tags:
+    - decision-records
+    - yaml
+    - tooling
+    - mcp
+
+context: >
+  The project needs a single, machine-readable format for all decision
+  records (ADRs, DDRs, SDRs, ODRs, TDRs, PDRs). The original approach
+  used Markdown files with YAML front matter stored in a single
+  .continue/decisions/ directory. This created two problems: the Markdown
+  body was unstructured and could not be validated by a schema, and
+  centralizing all records in one directory prevented co-location with the
+  code they govern. A format is needed that is fully schema-validatable,
+  human-readable, and supports discovery anywhere in the project tree.
+
+decision:
+  chosen_option: Pure YAML files conforming to docs/decision-record-schema.json
+  justification: >
+    Pure YAML allows the entire record — context, decision rationale,
+    enforced constraints, and consequences — to be validated against a
+    JSON Schema at commit time. Removing the Markdown body eliminates
+    unstructured free text that the AI harness cannot enforce. YAML is
+    human-readable and widely supported. Co-location is achieved by
+    walking the project tree for directories named adr/, ddr/, sdr/,
+    odr/, tdr/, or pdr/ rather than scanning a fixed path.
+
+consequences:
+  enforced_constraints:
+    - "Do store all decision records as .yaml files in a directory named
+      after their type (adr/, ddr/, sdr/, odr/, tdr/, pdr/)."
+    - "Do NOT use Markdown or JSON as the record file format."
+    - "Do NOT store enforced rules as unstructured prose — use the
+      enforced_constraints array so the AI harness can load and apply them."
+
+  classified_consequences:
+    - impact: good
+      description: >
+        Full schema validation at commit time catches missing or malformed
+        fields before records reach the MCP server.
+    - impact: good
+      description: >
+        Records can be co-located with the code they govern, making
+        constraints discoverable by developers working in that area.
+    - impact: good
+      description: >
+        The MCP lightweight index is clean and bounded — enforced
+        constraints are only loaded into context when explicitly fetched.
+    - impact: bad
+      description: >
+        Existing Markdown-based records must be migrated to YAML.
+        No migration tooling is provided; records must be rewritten manually.
+    - impact: neutral
+      description: >
+        The fetch_architecture_decision tool now accepts path-qualified
+        scoped IDs (e.g. docs/ADR-0000) rather than bare IDs, requiring
+        any existing CLAUDE.md retrieval instructions to be updated.

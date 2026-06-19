@@ -1,5 +1,5 @@
 # To-Do List 
-- [ ] Re-design all decision records to be completely YAML: YADR records, with a unified schema for all types of decision records.
+- [X] Re-design all decision records to be completely YAML: YADR records, with a unified schema for all types of decision records.
 - [ ] Update paths for ADRs and DDRs to docs/adr and docs/ddr, respectively.
 - [ ] Spend some good time researching and working out formats for ADRs and DDRs that meet industry standards and conventions.
 - [ ] Get a solid design for front matter for decision records.
