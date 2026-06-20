@@ -11,15 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.0
 
-      - name: Setup Project Python Environment
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
 
-      - name: Install Validation Dependencies
-        run: pip install pyyaml
+      - name: Install Dependencies
+        run: uv sync
 
       - name: Run Schema Parsing Tests
-        run: python .github/scripts/validate_decisions.py
+        run: uv run python .github/scripts/validate_decisions.py
