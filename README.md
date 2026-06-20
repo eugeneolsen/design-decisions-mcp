@@ -8,59 +8,89 @@ This server acts as an *Architectural Context Oracle*: when an AI assistant is a
 
 ## Decision Records
 
-Decision records live in two directories:
+Decision records are stored as pure YAML files and **co-located with the code they govern**. Any directory named `adr/`, `ddr/`, `sdr/`, `odr/`, `tdr/`, or `pdr/` anywhere in the project tree is a valid record container.
 
-| Type | Path | Purpose |
-|------|------|---------|
-| ADR | `docs/adr/` | Architecture Decision Records — major structural or technology choices |
-| DDR | `docs/ddr/` | Design Decision Records — implementation patterns and conventions |
+| Type | Prefix | Purpose |
+|------|--------|---------|
+| ADR | `ADR-` | Architecture Decision Records — major structural or technology choices |
+| DDR | `DDR-` | Design Decision Records — implementation patterns and conventions |
+| SDR | `SDR-` | Security Decision Records — security and compliance guardrails |
+| ODR | `ODR-` | Operations Decision Records — infrastructure and deployment constraints |
+| TDR | `TDR-` | Technical/Product Decision Records — vendor and tool boundaries |
+| PDR | `PDR-` | Process Decision Records — automation and CI/CD standards |
 
-> **Note:** Front matter fields and document formats for ADRs and DDRs are being finalized to meet industry standards. The structure below reflects the current minimum required schema.
+**Examples:**
+- `docs/adr/ADR-0001-microservices-split.yaml` → scoped ID: `docs/ADR-0001`
+- `services/billing/ddr/DDR-0001-stripe-idempotency.yaml` → scoped ID: `services/billing/DDR-0001`
 
 ### File Format
 
-Each decision record is a Markdown file with a YAML front matter block:
+Each decision record is a pure YAML file. The schema is defined in `docs/decision-record-schema.json`.
 
-```markdown
----
+**Example:**
+
+```yaml
 id: ADR-0001
+type: architecture
 title: Use PostgreSQL as the primary database
-description: Establishes PostgreSQL as the sole relational store for all persistent data.
-tags:
-  - database
-  - infrastructure
----
+date: "2026-06-19"
+status: accepted
 
-## Context
-...
+meta:
+  tags:
+    - database
+    - infrastructure
 
-## Decision
-...
+context: |
+  The application requires a relational database to handle complex queries
+  and ACID transactions. PostgreSQL was chosen over MySQL and commercial
+  options based on maturity, licensing, and operator familiarity.
 
-## Consequences
-...
+decision:
+  chosen_option: PostgreSQL as the sole relational store
+  justification: >
+    PostgreSQL offers strong ACID guarantees, JSON support, and no licensing
+    restrictions. The team has production experience with it at scale.
+
+consequences:
+  enforced_constraints:
+    - "Do store all relational data in PostgreSQL."
+    - "Do NOT use document databases for transactional data."
+  
+  classified_consequences:
+    - impact: good
+      description: ACID guarantees eliminate entire classes of data corruption bugs.
+    - impact: good
+      description: Team expertise reduces operational risk.
+    - impact: bad
+      description: Scaling PostgreSQL horizontally requires careful sharding strategy.
 ```
 
-**Required front matter fields:**
+**Required fields:** `id`, `type`, `title`, `date`, `status`, `context`, `decision`, `consequences`
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Unique identifier, e.g. `ADR-0001` or `DDR-0012` |
-| `title` | string | Short human-readable name for the decision |
-| `description` | string | One-sentence summary used for discovery |
-| `tags` | list | One or more topic tags (non-empty) |
+See `docs/decision-record-schema.json` for the complete schema definition and optional fields.
 
 ## MCP Tools
 
 The server exposes two tools to AI clients:
 
-### `list_architecture_decisions`
+### `list_architecture_decisions()`
 
-Returns a lightweight registry of all decision records — IDs, titles, descriptions, and tags only. Call this first to discover which records may apply to the current task.
+Returns a lightweight registry of all decision records discovered in the project tree. For each record, returns:
+- **Scoped ID** (e.g., `docs/ADR-0001` or `services/billing/DDR-0001`)
+- **Type** (architecture, design, security, operations, product, process)
+- **Title**
+- **Context preview** (first 120 characters)
+- **Tags**
 
-### `fetch_architecture_decision(decision_id)`
+Call this first to discover which records may apply to the current task.
 
-Fetches the complete body of a specific record by its ID (e.g., `ADR-0001`). Call this only after identifying a relevant ID from the listing tool.
+### `fetch_architecture_decision(scoped_id)`
+
+Fetches the complete YAML content of a specific record by its scoped ID. Arguments:
+- `scoped_id`: The path-qualified ID returned by `list_architecture_decisions`, e.g., `docs/ADR-0001` or `services/billing/DDR-0001`
+
+Call this only after identifying a relevant ID from the listing tool. Returns the full record including `enforced_constraints` and detailed consequences.
 
 ## Installation
 
@@ -77,22 +107,36 @@ uv sync
 ### Running the server
 
 ```bash
-uv run mcp-decisions-llm.py
+uv run python mcp-decisions-llm.py
 ```
 
 The server communicates over `stdio` and is intended to be launched by an MCP-compatible client (e.g., Claude Code, Continue, or another MCP host).
 
 ### Configuring your MCP client
 
-Point your MCP client at the server script. Example for a `mcp.json`-style config:
+Point your MCP client at the server script. Example for a `.mcp.json`-style config (e.g., Claude Code on Windows):
 
 ```json
 {
   "mcpServers": {
-    "design-decisions": {
+    "decision-memory": {
+      "type": "stdio",
+      "command": ".\\venv\\Scripts\\python.exe",
+      "args": ["mcp-decisions-llm.py"]
+    }
+  }
+}
+```
+
+Or with `uv` directly:
+
+```json
+{
+  "mcpServers": {
+    "decision-memory": {
+      "type": "stdio",
       "command": "uv",
-      "args": ["run", "mcp-decisions-llm.py"],
-      "cwd": "/path/to/design-decisions-mcp"
+      "args": ["run", "python", "mcp-decisions-llm.py"]
     }
   }
 }
@@ -109,18 +153,24 @@ The recommended two-stage retrieval pattern for AI assistants:
 
 ## Validation
 
-A GitHub Actions workflow runs on every push and pull request to `main` and `develop`. It validates that all decision records in the decisions directories have well-formed YAML front matter and all required fields.
+A GitHub Actions workflow runs on every push and pull request to `main` and `develop`. It validates that all decision records conform to `docs/decision-record-schema.json` using `jsonschema`.
 
 ```
 .github/
-  workflows/validate_decisions.yml   # CI workflow
-  scripts/validate_decisions.py      # Validation script (run locally or in CI)
+  workflows/validate_decisions.yml   # CI workflow (runs on push/PR)
+  scripts/validate_decisions.py      # Validation script (runs locally or in CI)
 ```
 
 Run validation locally:
 
 ```bash
-python .github/scripts/validate_decisions.py
+uv run python .github/scripts/validate_decisions.py
 ```
 
-Exit code `0` means all records passed; exit code `1` reports which files have errors.
+Or validate a specific file:
+
+```bash
+uv run python .github/scripts/validate_decisions.py docs/adr/ADR-0001-my-decision.yaml
+```
+
+Exit code `0` means all records passed; exit code `1` reports validation errors. The validator walks the entire project tree searching for `.yaml` files in any `adr/`, `ddr/`, `sdr/`, `odr/`, `tdr/`, or `pdr/` directory.
