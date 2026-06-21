@@ -94,7 +94,79 @@ Call this only after identifying a relevant ID from the listing tool. Returns th
 
 ## Installation
 
-> **Note:** Simplified packaging and installation is planned. Currently, setup requires the following manual steps.
+### Global Install (Recommended)
+
+Install once per machine, and every Claude Code session automatically has access to decision records across all projects.
+
+**Prerequisites:** [uv](https://docs.astral.sh/uv/) (Python 3.13+ is installed as a dependency)
+
+**1. Install globally:**
+
+```bash
+uv tool install git+https://github.com/eugeneolsen/design-decisions-mcp.git
+```
+
+**2. Add to `~/.claude/settings.json`:**
+
+```json
+{
+  "mcpServers": {
+    "decision-memory": {
+      "type": "stdio",
+      "command": "design-decisions-mcp"
+    }
+  }
+}
+```
+
+That's it. Every Claude Code session on that machine will now have the `list_architecture_decisions` and `fetch_architecture_decision` tools available.
+
+**Alternative: Using `uvx` (no persistent install)**
+
+For teams that prefer not to install permanently:
+
+```json
+{
+  "mcpServers": {
+    "decision-memory": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/eugeneolsen/design-decisions-mcp.git", "design-decisions-mcp"]
+    }
+  }
+}
+```
+
+This fetches and runs the server on first use, with no persistent installation.
+
+### AI Assistant Instructions
+
+Append the following to `~/.claude/CLAUDE.md` (or to your project's `CLAUDE.md` if you prefer per-project setup):
+
+```markdown
+## Engineering Conformance Protocol
+
+Before editing code or creating files, call `list_architecture_decisions` to discover
+applicable guardrails. Fetch records that apply with `fetch_architecture_decision`.
+Do not re-call the listing tool within the same context window unless your history
+undergoes an explicit /compact event or context wipe (e.g. /clear).
+```
+
+### Per-Project Setup (Optional)
+
+To initialize a project with decision records and local MCP config:
+
+```bash
+design-decisions-mcp init
+```
+
+This will:
+1. Create or update `CLAUDE.md` with the Engineering Conformance Protocol (if not already present)
+2. Optionally create a local `.mcp.json` for project-specific MCP configuration
+
+### Development/Local Setup
+
+If you're developing this project or running it locally without a global install:
 
 **Prerequisites:** Python 3.13+, [uv](https://docs.astral.sh/uv/)
 
@@ -104,31 +176,13 @@ cd design-decisions-mcp
 uv sync
 ```
 
-### Running the server
+**Run the server:**
 
 ```bash
-uv run python mcp-decisions-llm.py
+uv run python mcp_decisions_llm.py
 ```
 
-The server communicates over `stdio` and is intended to be launched by an MCP-compatible client (e.g., Claude Code, Continue, or another MCP host).
-
-### Configuring your MCP client
-
-Point your MCP client at the server script. Example for a `.mcp.json`-style config (e.g., Claude Code on Windows):
-
-```json
-{
-  "mcpServers": {
-    "decision-memory": {
-      "type": "stdio",
-      "command": ".\\venv\\Scripts\\python.exe",
-      "args": ["mcp-decisions-llm.py"]
-    }
-  }
-}
-```
-
-Or with `uv` directly:
+**Local MCP configuration:**
 
 ```json
 {
@@ -136,7 +190,7 @@ Or with `uv` directly:
     "decision-memory": {
       "type": "stdio",
       "command": "uv",
-      "args": ["run", "python", "mcp-decisions-llm.py"]
+      "args": ["run", "python", "mcp_decisions_llm.py"]
     }
   }
 }

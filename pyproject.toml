@@ -1,3 +1,10 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["mcp_decisions_llm"]
+
 [project]
 name = "design-decisions-mcp"
 version = "0.1.0"
@@ -38,3 +45,6 @@ dependencies = [
     "typing-inspection==0.4.2",
     "uvicorn==0.49.0",
 ]
+
+[project.scripts]
+design-decisions-mcp = "mcp_decisions_llm:main"
