@@ -97,5 +97,41 @@ def fetch_architecture_decision(decision_id: str) -> str:
     )
 
 
+def init_project():
+    """Initialize current project with decision records setup."""
+    claude_md_path = "CLAUDE.md"
+    conformance_protocol = """## Engineering Conformance Protocol
+
+Before editing code or creating files, call `list_architecture_decisions` to discover
+applicable guardrails. Fetch records that apply with `fetch_architecture_decision`.
+Do not re-call the listing tool within the same context window unless your history
+undergoes an explicit /compact event or context wipe (e.g. /clear).
+"""
+
+    # Check if file exists and already has the protocol
+    if os.path.exists(claude_md_path):
+        with open(claude_md_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        if "Engineering Conformance Protocol" in content:
+            print(f"{claude_md_path} already contains the Engineering Conformance Protocol")
+            return
+        # Append to existing file
+        with open(claude_md_path, "a", encoding="utf-8") as f:
+            f.write("\n" + conformance_protocol)
+        print(f"Updated {claude_md_path} with Engineering Conformance Protocol")
+    else:
+        # Create new file
+        with open(claude_md_path, "w", encoding="utf-8") as f:
+            f.write("# Project CLAUDE.md\n\n" + conformance_protocol)
+        print(f"Created {claude_md_path} with Engineering Conformance Protocol")
+
+
+def main():
+    if "init" in sys.argv:
+        init_project()
+    else:
+        mcp.run(transport="stdio")
+
+
 if __name__ == "__main__":
-    mcp.run(transport="stdio")
+    main()

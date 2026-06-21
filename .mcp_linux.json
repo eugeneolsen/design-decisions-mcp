@@ -3,7 +3,7 @@
     "decision-memory": {
       "type": "stdio",
       "command": "uv",
-      "args": ["run", "python", "mcp-decisions-llm.py"]
+      "args": ["run", "python", "mcp_decisions_llm.py"]
     }
   }
 }
