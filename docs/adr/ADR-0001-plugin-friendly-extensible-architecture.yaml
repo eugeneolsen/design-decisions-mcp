@@ -2,7 +2,7 @@ id: ADR-0001
 type: architecture
 title: Design MCP Server with Plugin-Friendly Extensible Architecture
 date: "2026-06-22"
-status: proposed
+status: approved
 
 meta:
   tags:
