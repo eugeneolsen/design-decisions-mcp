@@ -1,0 +1,88 @@
+id: DDR-0001
+type: design
+title: Prioritize Markdown with YAML Frontmatter and JSON as First Format Extensions
+date: "2026-06-22"
+status: proposed
+
+meta:
+  tags:
+    - formats
+    - extensibility
+    - implementation
+
+context: >
+  ADR-0001 establishes a plugin-friendly architecture for the MCP server to
+  support multiple decision record formats. This DDR determines which formats
+  to prioritize for initial implementation.
+
+  Teams use different formats based on their existing practices:
+  - Markdown with YAML frontmatter: Hugo/Jekyll style, human-readable, very
+    common in documentation-heavy projects
+  - JSON: Machine-friendly, easier for tool integration, common in
+    JavaScript/web projects
+  - TOML: Growing popularity in Rust/Python communities
+  - Org-mode: Used by Emacs-heavy teams
+  - Plain text with conventions: Traditional ADR format (Nygard style)
+
+  We need to choose which formats to implement first, balancing adoption
+  impact against implementation effort.
+
+decision:
+  chosen_option: >
+    Implement Markdown with YAML frontmatter first, followed by JSON. These
+    two formats cover the largest adoption base with reasonable implementation
+    complexity. Defer TOML, Org-mode, and plain text conventions until after
+    validating the plugin architecture works well with these two formats.
+
+  justification: >
+    Markdown with frontmatter has highest adoption among modern ADR practices.
+    It's human-readable, works well with version control, and many teams
+    already use Markdown for documentation. JSON is machine-friendly and
+    appeals to tool-integration use cases. Together, they likely cover 60-70%
+    of potential users.
+
+    Implementing these two first lets us validate the plugin interface is
+    stable and useful before committing to more formats. Future formats can
+    be added as plugins with confidence the interface works.
+
+consequences:
+  enforced_constraints:
+    - "Do implement Markdown+YAML as the first format plugin using the same
+      FormatHandler interface as built-in YAML. This validates the interface
+      works for external implementations."
+    - "Do implement JSON as the second format plugin, also via FormatHandler."
+    - "Do defer TOML, Org-mode, and other formats until after Markdown and
+      JSON plugins are stable and tested in production."
+    - "Do extract YAML frontmatter from Markdown using a robust parser; do not
+      implement a custom YAML extractor."
+
+  classified_consequences:
+    - impact: good
+      description: >
+        Markdown+YAML frontmatter appeals to documentation-heavy teams and
+        increases adoption among users already investing in Markdown ADRs.
+
+    - impact: good
+      description: >
+        JSON appeals to tool-integration and programmatic use cases, enabling
+        workflows where decision records are auto-generated or synced with
+        external systems.
+
+    - impact: good
+      description: >
+        Implementing two different formats early validates the plugin
+        interface is stable and reusable, giving confidence to future format
+        implementations.
+
+    - impact: neutral
+      description: >
+        Teams using TOML, Org-mode, or plain text conventions must wait or
+        implement their own plugins. Mitigation: document the plugin interface
+        clearly so community contributions are possible.
+
+    - impact: bad
+      description: >
+        Parsing Markdown+YAML frontmatter requires an external dependency
+        (e.g., frontmatter library). Mitigation: choose a lightweight,
+        well-maintained dependency; consider implementing frontmatter parsing
+        directly if no good library exists.
