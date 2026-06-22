@@ -144,6 +144,7 @@
                 "proposed",
                 "accepted",
                 "rejected",
+                "deprecated",
                 "superseded"
             ],
             "description": "The current lifecycle state of the decision."

@@ -1,0 +1,111 @@
+id: ADR-0001
+type: architecture
+title: Design MCP Server with Plugin-Friendly Extensible Architecture
+date: "2026-06-22"
+status: accepted
+
+meta:
+  tags:
+    - mcp-server
+    - extensibility
+    - architecture
+    - plugin-system
+
+context: >
+  The MCP server was initially built to support a single decision record format
+  (YAML). As adoption grows, teams with different established practices express
+  interest in using the tool with their preferred formats: Markdown, JSON, TOML,
+  Org-mode, etc.
+
+  Adding each format directly to the core server creates maintenance burden:
+  - Each new format requires changes to record discovery logic
+  - Each new format requires changes to validation logic
+  - Each new format requires changes to response/serialization logic
+  - Format-specific code mixes with server core, making the codebase harder
+    to navigate and reason about
+  - Future format contributions require deep changes to multiple server
+    subsystems
+
+  Over time, the server could become a sprawling monolith with format logic
+  scattered throughout, making it difficult for teams to contribute new formats
+  or maintain existing ones.
+
+  We want the server to be a durable, widely-adopted tool that teams can
+  extend for their own needs without requiring core maintainer involvement
+  for every new format.
+
+decision:
+  chosen_option: >
+    Design the MCP server with a plugin-friendly architecture from the start.
+    Create abstractions (interfaces/protocols) that format implementations,
+    validators, and future extension points can implement and register with
+    the core server. The core server acts as an orchestrator that discovers,
+    routes to, and aggregates results from registered plugins without
+    requiring knowledge of plugin-specific details.
+
+  justification: >
+    A plugin architecture embodies the Open/Closed Principle: the server
+    is open for extension (new plugins) but closed for modification (core
+    logic doesn't change). This allows:
+
+    - Independent format implementations without modifying server core
+    - Clear separation of concerns: plugins own their format details
+    - Easier testing: plugins can be tested in isolation
+    - Future community contributions: external plugins can exist without
+      requiring main repo changes
+    - Scaling: adding the 10th format is as easy as adding the 2nd
+    - Maintainability: core server remains lean and focused
+
+consequences:
+  enforced_constraints:
+    - "Do NOT add format-specific logic directly to core discovery, validation,
+      or response functions. Route through registered plugin interfaces."
+    - "Do define stable, well-documented plugin interfaces (FormatHandler,
+      Validator, etc.) before implementing the first plugin. Interface changes
+      break third-party implementations."
+    - "Do implement each built-in format as a plugin using the same interface
+      as external plugins would use. This forces the interface to remain
+      useful and stable."
+    - "Do provide clear documentation and examples for implementing new
+      format plugins."
+
+  classified_consequences:
+    - impact: good
+      description: >
+        The server can grow to support many formats without becoming
+        monolithic. New formats are additive, not invasive.
+
+    - impact: good
+      description: >
+        Teams can implement custom format support for their specific needs
+        (e.g., Notion sync, Confluence integration) without requiring
+        contributions to the main repo.
+
+    - impact: good
+      description: >
+        Core server code remains focused and maintainable. Format complexity
+        stays in format plugins, not in orchestration logic.
+
+    - impact: good
+      description: >
+        Clear plugin boundaries make the codebase easier for new contributors
+        to understand and extend.
+
+    - impact: neutral
+      description: >
+        Initial implementation requires defining and implementing plugin
+        interfaces. This adds some upfront complexity. However, the benefit
+        multiplies as formats accumulate.
+
+    - impact: bad
+      description: >
+        If plugin interfaces are poorly designed, format implementations can
+        diverge in behavior or quality. Mitigation: invest in clear interface
+        documentation, provide reference implementations, and add tests that
+        validate the interface contract.
+
+    - impact: bad
+      description: >
+        Plugin system adds a layer of indirection. Simple operations become
+        slightly more complex due to routing through the plugin registry.
+        Mitigation: profile core paths to ensure performance is acceptable.
