@@ -176,13 +176,20 @@ If you're developing this project or running it locally without a global install
 ```bash
 git clone https://github.com/eugeneolsen/design-decisions-mcp.git
 cd design-decisions-mcp
-uv sync
+uv sync          # runtime dependencies only
+uv sync --group dev  # + pytest and pytest-mock for running tests
 ```
 
 **Run the server:**
 
 ```bash
 uv run python mcp_decisions_llm.py
+```
+
+**Run the tests:**
+
+```bash
+uv run pytest
 ```
 
 **Local MCP configuration:**
