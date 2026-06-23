@@ -48,3 +48,13 @@ dependencies = [
 
 [project.scripts]
 design-decisions-mcp = "mcp_decisions_llm:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-mock>=3.14",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+addopts = "-v --tb=short"
