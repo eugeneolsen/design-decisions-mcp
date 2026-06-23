@@ -154,15 +154,18 @@ undergoes an explicit /compact event or context wipe (e.g. /clear).
 
 ### Per-Project Setup (Optional)
 
-To initialize a project with decision records and local MCP config:
+To initialize a project with automatic validation, run once in the project root:
 
 ```bash
 design-decisions-mcp init
 ```
 
-This will:
-1. Create or update `CLAUDE.md` with the Engineering Conformance Protocol (if not already present)
-2. Optionally create a local `.mcp.json` for project-specific MCP configuration
+This will set up:
+1. **`CLAUDE.md`** — Engineering Conformance Protocol for the project's AI assistant
+2. **`.github/workflows/validate-decisions.yml`** — Automatic validation on every push and pull request
+3. **`.githooks/pre-commit`** — Automatic validation before every commit (after running `git config core.hooksPath .githooks`)
+
+All setup is idempotent; it's safe to re-run `init` at any time.
 
 ### Development/Local Setup
 
@@ -207,24 +210,37 @@ The recommended two-stage retrieval pattern for AI assistants:
 
 ## Validation
 
-A GitHub Actions workflow runs on every push and pull request to `main` and `develop`. It validates that all decision records conform to `docs/decision-record-schema.json` using `jsonschema`.
+Decision records are validated against `docs/decision-record-schema.json` using the `jsonschema` library.
 
-```
-.github/
-  workflows/validate_decisions.yml   # CI workflow (runs on push/PR)
-  scripts/validate_decisions.py      # Validation script (runs locally or in CI)
-```
+### Automatic Validation (After `design-decisions-mcp init`)
 
-Run validation locally:
+Once you've run `design-decisions-mcp init` in your project, validation happens automatically:
 
-```bash
-uv run python .github/scripts/validate_decisions.py
-```
+- **Before every commit** — Pre-commit hook blocks commits with invalid records
+- **On every push/PR** — GitHub Actions workflow validates all records in CI
 
-Or validate a specific file:
+### Manual Validation
+
+Validate all records in the current project:
 
 ```bash
-uv run python .github/scripts/validate_decisions.py docs/adr/ADR-0001-my-decision.yaml
+design-decisions-mcp validate
+```
+
+Or validate specific files:
+
+```bash
+design-decisions-mcp validate docs/adr/ADR-0001.yaml services/billing/ddr/DDR-0001.yaml
 ```
 
 Exit code `0` means all records passed; exit code `1` reports validation errors. The validator walks the entire project tree searching for `.yaml` files in any `adr/`, `ddr/`, `sdr/`, `odr/`, `tdr/`, or `pdr/` directory.
+
+### CI/CD Setup
+
+The `design-decisions-mcp init` command automatically creates `.github/workflows/validate-decisions.yml`, which runs on every push and pull request. The workflow uses `uvx` to fetch and run the latest version of the validator:
+
+```yaml
+run: uvx --from git+https://github.com/eugeneolsen/design-decisions-mcp.git design-decisions-mcp validate
+```
+
+This ensures validation works even for projects that don't have the tool installed permanently.
