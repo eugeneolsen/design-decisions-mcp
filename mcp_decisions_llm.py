@@ -4,6 +4,7 @@ import stat
 import sys
 import yaml
 import jsonschema
+from importlib.metadata import version as _pkg_version
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("Architectural Context Oracle")
@@ -338,6 +339,8 @@ def main():
         specific_files = [arg for arg in sys.argv[2:] if arg.endswith(".yaml")]
         passed = validate_decisions(files=specific_files if specific_files else None)
         sys.exit(0 if passed else 1)
+    elif "--version" in sys.argv or "-V" in sys.argv:
+        print(_pkg_version("design-decisions-mcp"))
     else:
         mcp.run(transport="stdio")
 
