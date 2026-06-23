@@ -135,3 +135,6 @@ Thumbs.db
 
 # Project-specific
 *.pid
+
+# Claude Code harness
+.claude/
