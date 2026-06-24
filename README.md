@@ -253,3 +253,8 @@ run: uvx --from git+https://github.com/eugeneolsen/design-decisions-mcp.git desi
 ```
 
 This ensures validation works even for projects that don't have the tool installed permanently.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE.md).
+See the [LICENSE.md](LICENSE.md) file for details.
