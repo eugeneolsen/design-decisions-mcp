@@ -20,4 +20,4 @@ jobs:
         run: uv sync
 
       - name: Run Schema Parsing Tests
-        run: uv run python .github/scripts/validate_decisions.py
+        run: uv run python mcp_decisions_llm.py validate
