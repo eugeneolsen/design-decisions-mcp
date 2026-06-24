@@ -25,7 +25,7 @@ Decision records are stored as pure YAML files and **co-located with the code th
 
 ### File Format
 
-Each decision record is a pure YAML file. The schema is defined in `docs/decision-record-schema.json`.
+Each decision record is a pure YAML file. The schema is defined in `design_decision_schema.py`.
 
 **Example:**
 
@@ -68,7 +68,7 @@ consequences:
 
 **Required fields:** `id`, `type`, `title`, `date`, `status`, `context`, `decision`, `consequences`
 
-See `docs/decision-record-schema.json` for the complete schema definition and optional fields.
+See `design_decision_schema.py` for the complete schema definition and optional fields.
 
 ## MCP Tools
 
@@ -217,7 +217,7 @@ The recommended two-stage retrieval pattern for AI assistants:
 
 ## Validation
 
-Decision records are validated against `docs/decision-record-schema.json` using the `jsonschema` library.
+Decision records are validated against the schema defined in `design_decision_schema.py` using the `jsonschema` library.
 
 ### Automatic Validation (After `design-decisions-mcp init`)
 

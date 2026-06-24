@@ -22,7 +22,7 @@ context: >
   human-readable, and supports discovery anywhere in the project tree.
 
 decision:
-  chosen_option: Pure YAML files conforming to docs/decision-record-schema.json
+  chosen_option: Pure YAML files conforming to the schema in design_decision_schema.py
   justification: >
     Pure YAML allows the entire record — context, decision rationale,
     enforced constraints, and consequences — to be validated against a
