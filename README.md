@@ -1,6 +1,8 @@
 # Design Decision MCP Server
 
-An MCP (Model Context Protocol) server that surfaces Architecture Decision Records (ADRs) and Design Decision Records (DDRs) to AI coding assistants as just-in-time architectural guardrails.
+An MCP (Model Context Protocol) server that surfaces Architecture Decision Records (ADRs) and Design Decision Records (DDRs) to AI coding assistants as just-in-time architectural guardrails.  
+
+More simply stated, this MCP server turns the types of decision records listed below into something very similar to agent Skills.
 
 ## Overview
 
