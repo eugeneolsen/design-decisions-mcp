@@ -51,3 +51,15 @@ class TestMainDispatch:
         mocker.patch("mcp_decisions_llm.mcp.run")
         # Should not raise SystemExit
         main()
+
+    def test_version_flag_prints_version(self, monkeypatch, capsys):
+        monkeypatch.setattr(sys, "argv", ["cmd", "--version"])
+        main()
+        captured = capsys.readouterr()
+        assert captured.out.strip() == "0.1.0"
+
+    def test_short_version_flag(self, monkeypatch, capsys):
+        monkeypatch.setattr(sys, "argv", ["cmd", "-V"])
+        main()
+        captured = capsys.readouterr()
+        assert captured.out.strip() == "0.1.0"
