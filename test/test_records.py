@@ -1,6 +1,8 @@
 import pytest
+from unittest.mock import patch
 
 from mcp_decisions_llm import get_all_records, list_architecture_decisions, fetch_architecture_decision
+import mcp_decisions_llm
 
 
 class TestGetAllRecords:
@@ -186,3 +188,89 @@ class TestFetchArchitectureDecision:
         write_yaml("docs/adr/ADR-0001.yaml", minimal_valid_record)
         result = fetch_architecture_decision("docs/ADR-0001")
         assert "Title: Use something for something important" in result
+
+
+class TestFileSizeLimit:
+    """Tests for L-1: file size limit defense against large/bomb YAML files."""
+
+    def test_oversized_file_is_skipped(self, tmp_project, write_yaml, minimal_valid_record, capsys):
+        """Record in an oversized file should be skipped with warning."""
+        write_yaml("adr/ADR-0001.yaml", minimal_valid_record)
+        with patch("mcp_decisions_llm.os.path.getsize") as mock_size:
+            mock_size.return_value = 10 * 1024 * 1024  # 10 MB, exceeds 5 MB limit
+            records = get_all_records()
+            assert len(records) == 0
+            captured = capsys.readouterr()
+            assert "exceeds" in captured.err
+
+    def test_file_within_size_limit_is_loaded(self, tmp_project, write_yaml, minimal_valid_record):
+        """Record in a normal-sized file should be loaded."""
+        write_yaml("adr/ADR-0001.yaml", minimal_valid_record)
+        records = get_all_records()
+        assert len(records) == 1
+        assert "./ADR-0001" in records
+
+
+class TestRecordsCache:
+    """Tests for L-2: caching to avoid re-scanning and re-parsing on every call."""
+
+    @pytest.fixture(autouse=True)
+    def reset_cache(self):
+        """Reset module-level cache before each test."""
+        mcp_decisions_llm._records_cache = None
+        mcp_decisions_llm._cache_fingerprint = None
+        yield
+        mcp_decisions_llm._records_cache = None
+        mcp_decisions_llm._cache_fingerprint = None
+
+    def test_second_call_skips_yaml_parse(self, tmp_project, write_yaml, minimal_valid_record):
+        """Second call with unchanged files should not re-parse YAML."""
+        write_yaml("adr/ADR-0001.yaml", minimal_valid_record)
+        with patch("mcp_decisions_llm.yaml.safe_load", wraps=__import__("yaml").safe_load) as mock_load:
+            # First call
+            records1 = get_all_records()
+            assert len(records1) == 1
+            first_call_count = mock_load.call_count
+
+            # Second call (cache hit)
+            records2 = get_all_records()
+            assert len(records2) == 1
+            assert records1 == records2
+            # yaml.safe_load should not have been called again
+            assert mock_load.call_count == first_call_count
+
+    def test_new_file_invalidates_cache(self, tmp_project, write_yaml, minimal_valid_record):
+        """Adding a new file should invalidate cache and be discovered."""
+        write_yaml("adr/ADR-0001.yaml", minimal_valid_record)
+        records1 = get_all_records()
+        assert len(records1) == 1
+
+        # Add a second record
+        record2 = minimal_valid_record.copy()
+        record2["id"] = "ADR-0002"
+        write_yaml("adr/ADR-0002.yaml", record2)
+
+        # Cache should be invalidated (fingerprint changes due to new file)
+        records2 = get_all_records()
+        assert len(records2) == 2
+        assert "./ADR-0001" in records2
+        assert "./ADR-0002" in records2
+
+    def test_modified_file_invalidates_cache(self, tmp_project, write_yaml, minimal_valid_record):
+        """Modifying a file (mtime change) should invalidate cache."""
+        import time
+        write_yaml("adr/ADR-0001.yaml", minimal_valid_record)
+        records1 = get_all_records()
+        assert records1["./ADR-0001"]["title"] == "Use something for something important"
+
+        # Sleep to ensure mtime changes
+        time.sleep(0.01)
+
+        # Modify the file
+        modified = minimal_valid_record.copy()
+        modified["title"] = "Updated Title"
+        write_yaml("adr/ADR-0001.yaml", modified)
+
+        # Cache should be invalidated due to mtime change
+        records2 = get_all_records()
+        assert records2["./ADR-0001"]["title"] == "Updated Title"
