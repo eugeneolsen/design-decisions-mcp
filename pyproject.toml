@@ -47,3 +47,9 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["test"]
 addopts = "-v --tb=short"
+
+[tool.design-decisions-mcp]
+# Allowed discovery roots (default: ["docs", "src"])
+# Records are only discovered within these directories.
+# Set DESIGN_DECISIONS_MCP_ROOTS env var to override (colon-separated, e.g., "docs:src:architecture")
+discovery-roots = ["docs", "src"]

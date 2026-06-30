@@ -2,6 +2,7 @@ import json
 import os
 import stat
 import sys
+import tomllib
 import yaml
 import jsonschema
 from importlib.metadata import version as _pkg_version
@@ -11,6 +12,7 @@ from design_decision_schema import DECISION_RECORD_SCHEMA
 mcp = FastMCP("Architectural Context Oracle")
 
 TYPE_DIRS = {"adr", "ddr", "sdr", "odr", "tdr", "pdr"}
+VENDOR_DIRS = {"node_modules", "vendor", "site-packages", ".venv", ".git", "__pycache__", ".pytest_cache", "dist", "build"}
 
 GITHUB_ACTIONS_WORKFLOW = """\
 name: Architecture Records Conformance Check
@@ -45,37 +47,95 @@ design-decisions-mcp validate
 """
 
 
+def _load_from_pyproject():
+    """Load discovery-roots from pyproject.toml if present."""
+    if not os.path.exists("pyproject.toml"):
+        return None
+    try:
+        with open("pyproject.toml", "rb") as f:
+            pyproject = tomllib.load(f)
+        tool_config = pyproject.get("tool", {}).get("design-decisions-mcp", {})
+        roots = tool_config.get("discovery-roots")
+        if roots and isinstance(roots, list):
+            return roots
+    except Exception as e:
+        print(f"Warning: Could not read pyproject.toml: {e}", file=sys.stderr)
+    return None
+
+
+def _get_allowed_roots():
+    """
+    Determine allowed discovery roots with precedence:
+    1. DESIGN_DECISIONS_MCP_ROOTS env var (colon-separated)
+    2. pyproject.toml [tool.design-decisions-mcp] discovery-roots
+    3. Default: ["docs", "src"]
+    """
+    # Check environment variable
+    env_roots = os.environ.get("DESIGN_DECISIONS_MCP_ROOTS")
+    if env_roots:
+        return [r.strip() for r in env_roots.split(":") if r.strip()]
+
+    # Check pyproject.toml
+    toml_roots = _load_from_pyproject()
+    if toml_roots:
+        return toml_roots
+
+    # Default
+    return ["docs", "src"]
+
+
+def _should_skip_dir(dirname):
+    """Check if a directory should be skipped (vendor, hidden, etc.)."""
+    if dirname.startswith("."):
+        return True
+    if dirname in VENDOR_DIRS:
+        return True
+    return False
+
+
 def get_all_records():
-    """Walks the project tree discovering .yaml files in any xDR type directory."""
+    """
+    Walks allowed discovery roots discovering .yaml files in any xDR type directory.
+    Skips vendor and hidden directories at all levels.
+    """
     records = {}
-    for dirpath, dirnames, filenames in os.walk("."):
-        # Skip hidden directories (e.g. .git, .venv)
-        dirnames[:] = [d for d in dirnames if not d.startswith(".")]
-        if os.path.basename(dirpath) not in TYPE_DIRS:
+    allowed_roots = _get_allowed_roots()
+
+    for root in allowed_roots:
+        if not os.path.isdir(root):
             continue
-        scope = os.path.relpath(os.path.dirname(dirpath), ".").replace("\\", "/")
-        for filename in filenames:
-            if not filename.endswith(".yaml"):
+
+        for dirpath, dirnames, filenames in os.walk(root):
+            # Skip vendor and hidden directories
+            dirnames[:] = [d for d in dirnames if not _should_skip_dir(d)]
+
+            if os.path.basename(dirpath) not in TYPE_DIRS:
                 continue
-            file_path = os.path.join(dirpath, filename)
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    data = yaml.safe_load(f)
-                if not data or not isinstance(data, dict):
+
+            scope = os.path.relpath(os.path.dirname(dirpath), ".").replace("\\", "/")
+            for filename in filenames:
+                if not filename.endswith(".yaml"):
                     continue
-                record_id = str(data.get("id", "")).upper()
-                if not record_id:
-                    continue
-                scoped_key = f"{scope}/{record_id}"
-                records[scoped_key] = {
-                    "type": data.get("type", ""),
-                    "title": data.get("title", "Untitled Decision"),
-                    "context": data.get("context", ""),
-                    "tags": (data.get("meta") or {}).get("tags", []),
-                    "raw": data,
-                }
-            except Exception as e:
-                print(f"Skipping {file_path}: {e}", file=sys.stderr)
+                file_path = os.path.join(dirpath, filename)
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        data = yaml.safe_load(f)
+                    if not data or not isinstance(data, dict):
+                        continue
+                    record_id = str(data.get("id", "")).upper()
+                    if not record_id:
+                        continue
+                    scoped_key = f"{scope}/{record_id}"
+                    records[scoped_key] = {
+                        "type": data.get("type", ""),
+                        "title": data.get("title", "Untitled Decision"),
+                        "context": data.get("context", ""),
+                        "tags": (data.get("meta") or {}).get("tags", []),
+                        "raw": data,
+                    }
+                except Exception as e:
+                    print(f"Skipping {file_path}: {e}", file=sys.stderr)
+
     return records
 
 
@@ -166,12 +226,16 @@ def validate_decisions(files=None):
         files_to_check = files
     else:
         files_to_check = []
-        for dirpath, dirnames, filenames in os.walk("."):
-            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
-            if os.path.basename(dirpath) in TYPE_DIRS:
-                for filename in filenames:
-                    if filename.endswith(".yaml"):
-                        files_to_check.append(os.path.join(dirpath, filename))
+        allowed_roots = _get_allowed_roots()
+        for root in allowed_roots:
+            if not os.path.isdir(root):
+                continue
+            for dirpath, dirnames, filenames in os.walk(root):
+                dirnames[:] = [d for d in dirnames if not _should_skip_dir(d)]
+                if os.path.basename(dirpath) in TYPE_DIRS:
+                    for filename in filenames:
+                        if filename.endswith(".yaml"):
+                            files_to_check.append(os.path.join(dirpath, filename))
 
     if not files_to_check:
         print("No decision record files found.")
