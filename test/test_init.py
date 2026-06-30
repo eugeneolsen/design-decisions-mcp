@@ -7,7 +7,7 @@ from mcp_decisions_llm import (
     _init_github_actions_workflow,
     _init_pre_commit_hook,
     init_project,
-    GITHUB_ACTIONS_WORKFLOW,
+    _make_github_actions_workflow,
     PRE_COMMIT_HOOK,
 )
 
@@ -21,7 +21,7 @@ class TestInitGithubActionsWorkflow:
     def test_workflow_file_content(self, tmp_project):
         _init_github_actions_workflow()
         workflow_path = tmp_project / ".github" / "workflows" / "validate-decisions.yml"
-        assert workflow_path.read_text() == GITHUB_ACTIONS_WORKFLOW
+        assert workflow_path.read_text() == _make_github_actions_workflow()
 
     def test_idempotent_does_not_overwrite(self, tmp_project):
         _init_github_actions_workflow()

@@ -14,7 +14,11 @@ mcp = FastMCP("Architectural Context Oracle")
 TYPE_DIRS = {"adr", "ddr", "sdr", "odr", "tdr", "pdr"}
 VENDOR_DIRS = {"node_modules", "vendor", "site-packages", ".venv", "venv", "env", ".git", "__pycache__", ".pytest_cache", "dist", "build"}
 
-GITHUB_ACTIONS_WORKFLOW = """\
+
+def _make_github_actions_workflow():
+    """Generate GitHub Actions workflow with pinned versions and commit SHAs."""
+    current_version = _pkg_version("design-decisions-mcp")
+    return f"""\
 name: Architecture Records Conformance Check
 
 on:
@@ -28,13 +32,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938  # v4.2.0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0
 
       - name: Validate Decision Records
-        run: uvx --from git+https://github.com/eugeneolsen/design-decisions-mcp.git design-decisions-mcp validate
+        run: uvx --from git+https://github.com/eugeneolsen/design-decisions-mcp.git@v{current_version} design-decisions-mcp validate
 """
 
 PRE_COMMIT_HOOK = """\
@@ -347,7 +351,7 @@ def _init_github_actions_workflow():
 
     os.makedirs(workflow_dir, exist_ok=True)
     with open(workflow_path, "w", encoding="utf-8", newline="\n") as f:
-        f.write(GITHUB_ACTIONS_WORKFLOW)
+        f.write(_make_github_actions_workflow())
     print(f"Created {workflow_path}")
 
 
