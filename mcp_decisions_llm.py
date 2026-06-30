@@ -48,19 +48,19 @@ design-decisions-mcp validate
 
 
 def _load_from_pyproject():
-    """Load discovery-roots from pyproject.toml if present."""
+    """Load discovery configuration from pyproject.toml if present."""
     if not os.path.exists("pyproject.toml"):
-        return None
+        return {}, False
     try:
         with open("pyproject.toml", "rb") as f:
             pyproject = tomllib.load(f)
         tool_config = pyproject.get("tool", {}).get("design-decisions-mcp", {})
-        roots = tool_config.get("discovery-roots")
-        if roots and isinstance(roots, list):
-            return roots
+        roots = tool_config.get("discovery-roots", [])
+        git_only = tool_config.get("git-tracked-only", False)
+        return roots if isinstance(roots, list) else [], git_only
     except Exception as e:
         print(f"Warning: Could not read pyproject.toml: {e}", file=sys.stderr)
-    return None
+    return [], False
 
 
 def _get_allowed_roots():
@@ -76,12 +76,56 @@ def _get_allowed_roots():
         return [r.strip() for r in env_roots.split(":") if r.strip()]
 
     # Check pyproject.toml
-    toml_roots = _load_from_pyproject()
+    toml_roots, _ = _load_from_pyproject()
     if toml_roots:
         return toml_roots
 
     # Default
     return ["docs", "src"]
+
+
+def _should_use_git_tracked_only():
+    """
+    Determine if discovery should be restricted to git-tracked files.
+    Precedence:
+    1. DESIGN_DECISIONS_MCP_GIT_ONLY env var (set to 'true' or '1')
+    2. pyproject.toml [tool.design-decisions-mcp] git-tracked-only
+    3. Default: False
+    """
+    # Check environment variable
+    env_git_only = os.environ.get("DESIGN_DECISIONS_MCP_GIT_ONLY")
+    if env_git_only:
+        return env_git_only.lower() in ("true", "1", "yes")
+
+    # Check pyproject.toml
+    _, toml_git_only = _load_from_pyproject()
+    return toml_git_only
+
+
+def _get_git_tracked_files():
+    """
+    Get the set of files tracked by git. Returns None if not in a git repo.
+    """
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["git", "ls-files"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            return None
+        # Convert to absolute paths and normalize
+        return {os.path.abspath(line.strip()) for line in result.stdout.splitlines() if line.strip()}
+    except Exception:
+        return None
+
+
+def _is_git_tracked(file_path, git_tracked_set):
+    """Check if a file is in the git-tracked set."""
+    abs_path = os.path.abspath(file_path)
+    return abs_path in git_tracked_set
 
 
 def _should_skip_dir(dirname):
@@ -97,9 +141,22 @@ def get_all_records():
     """
     Walks allowed discovery roots discovering .yaml files in any xDR type directory.
     Skips vendor and hidden directories at all levels.
+    Optionally restricts to git-tracked files only.
     """
     records = {}
     allowed_roots = _get_allowed_roots()
+    use_git_tracked_only = _should_use_git_tracked_only()
+    git_tracked_files = None
+
+    if use_git_tracked_only:
+        git_tracked_files = _get_git_tracked_files()
+        if git_tracked_files is None:
+            print(
+                "Warning: git-tracked-only mode enabled but not in a git repository. "
+                "Discovery will be skipped.",
+                file=sys.stderr,
+            )
+            return records
 
     for root in allowed_roots:
         if not os.path.isdir(root):
@@ -117,6 +174,11 @@ def get_all_records():
                 if not filename.endswith(".yaml"):
                     continue
                 file_path = os.path.join(dirpath, filename)
+
+                # Check git-tracked status if enabled
+                if use_git_tracked_only and not _is_git_tracked(file_path, git_tracked_files):
+                    continue
+
                 try:
                     with open(file_path, "r", encoding="utf-8") as f:
                         data = yaml.safe_load(f)
@@ -219,7 +281,10 @@ def _validate_single_file(file_path, schema):
 
 
 def validate_decisions(files=None):
-    """Validate xDR YAML files against the embedded schema. Returns True if all pass."""
+    """
+    Validate xDR YAML files against the embedded schema. Returns True if all pass.
+    Optionally restricts to git-tracked files only.
+    """
     schema = DECISION_RECORD_SCHEMA
 
     if files:
@@ -227,6 +292,19 @@ def validate_decisions(files=None):
     else:
         files_to_check = []
         allowed_roots = _get_allowed_roots()
+        use_git_tracked_only = _should_use_git_tracked_only()
+        git_tracked_files = None
+
+        if use_git_tracked_only:
+            git_tracked_files = _get_git_tracked_files()
+            if git_tracked_files is None:
+                print(
+                    "Warning: git-tracked-only mode enabled but not in a git repository. "
+                    "Validation will be skipped.",
+                    file=sys.stderr,
+                )
+                return True
+
         for root in allowed_roots:
             if not os.path.isdir(root):
                 continue
@@ -235,7 +313,13 @@ def validate_decisions(files=None):
                 if os.path.basename(dirpath) in TYPE_DIRS:
                     for filename in filenames:
                         if filename.endswith(".yaml"):
-                            files_to_check.append(os.path.join(dirpath, filename))
+                            file_path = os.path.join(dirpath, filename)
+
+                            # Check git-tracked status if enabled
+                            if use_git_tracked_only and not _is_git_tracked(file_path, git_tracked_files):
+                                continue
+
+                            files_to_check.append(file_path)
 
     if not files_to_check:
         print("No decision record files found.")

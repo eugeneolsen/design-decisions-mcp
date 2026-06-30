@@ -53,3 +53,13 @@ addopts = "-v --tb=short"
 # Records are only discovered within these directories.
 # Set DESIGN_DECISIONS_MCP_ROOTS env var to override (colon-separated, e.g., "docs:src:architecture")
 discovery-roots = ["docs", "src"]
+
+# Restrict discovery to git-tracked files only (default: true)
+# SECURITY: When enabled (default), only YAML files tracked by git are discovered.
+# This closes the threat model by preventing discovery of records in untracked
+# directories (e.g., .gitignore'd files, temporary checkouts, or stashed changes).
+# Files must pass git tracking to be included, ensuring they went through the repo's
+# commit/review process (if branch protection is enforced).
+# Set DESIGN_DECISIONS_MCP_GIT_ONLY env var to override (true/false/1/0/yes/no).
+# Only disable this in development/testing when validating uncommitted records.
+git-tracked-only = true
