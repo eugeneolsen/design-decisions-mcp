@@ -14,6 +14,11 @@ mcp = FastMCP("Architectural Context Oracle")
 
 TYPE_DIRS = {"adr", "ddr", "sdr", "odr", "tdr", "pdr"}
 VENDOR_DIRS = {"node_modules", "vendor", "site-packages", ".venv", "venv", "env", ".git", "__pycache__", ".pytest_cache", "dist", "build"}
+MAX_YAML_FILE_BYTES = 5 * 1024 * 1024  # 5 MB
+
+# Module-level cache for get_all_records()
+_records_cache: dict | None = None
+_cache_fingerprint: frozenset | None = None
 
 
 def _make_github_actions_workflow():
@@ -142,13 +147,39 @@ def _should_skip_dir(dirname):
     return False
 
 
+def _collect_candidate_files(allowed_roots, use_git_tracked_only, git_tracked_files):
+    """Return list of (file_path, mtime, scope) for all candidate YAML files."""
+    candidates = []
+    for root in allowed_roots:
+        if not os.path.isdir(root):
+            continue
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if not _should_skip_dir(d)]
+            if os.path.basename(dirpath) not in TYPE_DIRS:
+                continue
+            scope = os.path.relpath(os.path.dirname(dirpath), ".").replace("\\", "/")
+            for filename in filenames:
+                if not filename.endswith(".yaml"):
+                    continue
+                file_path = os.path.join(dirpath, filename)
+                if use_git_tracked_only and not _is_git_tracked(file_path, git_tracked_files):
+                    continue
+                try:
+                    candidates.append((file_path, os.path.getmtime(file_path), scope))
+                except OSError:
+                    pass
+    return candidates
+
+
 def get_all_records():
     """
     Walks allowed discovery roots discovering .yaml files in any xDR type directory.
     Skips vendor and hidden directories at all levels.
     Optionally restricts to git-tracked files only.
+    Caches results based on file mtimes to avoid re-parsing on every call.
     """
-    records = {}
+    global _records_cache, _cache_fingerprint
+
     allowed_roots = _get_allowed_roots()
     use_git_tracked_only = _should_use_git_tracked_only()
     git_tracked_files = None
@@ -161,48 +192,46 @@ def get_all_records():
                 "Discovery will be skipped.",
                 file=sys.stderr,
             )
-            return records
+            return {}
 
-    for root in allowed_roots:
-        if not os.path.isdir(root):
-            continue
+    # Phase 1: collect candidate files without parsing
+    candidates = _collect_candidate_files(allowed_roots, use_git_tracked_only, git_tracked_files)
+    fingerprint = frozenset((fp, mt) for fp, mt, _ in candidates)
 
-        for dirpath, dirnames, filenames in os.walk(root):
-            # Skip vendor and hidden directories
-            dirnames[:] = [d for d in dirnames if not _should_skip_dir(d)]
+    # Check cache
+    if _records_cache is not None and _cache_fingerprint == fingerprint:
+        return _records_cache
 
-            if os.path.basename(dirpath) not in TYPE_DIRS:
+    # Phase 2: parse (cache miss)
+    records = {}
+    for file_path, _, scope in candidates:
+        try:
+            # Check file size before parsing
+            file_size = os.path.getsize(file_path)
+            if file_size > MAX_YAML_FILE_BYTES:
+                print(f"Skipping {file_path}: file size {file_size} exceeds {MAX_YAML_FILE_BYTES} bytes", file=sys.stderr)
                 continue
 
-            scope = os.path.relpath(os.path.dirname(dirpath), ".").replace("\\", "/")
-            for filename in filenames:
-                if not filename.endswith(".yaml"):
-                    continue
-                file_path = os.path.join(dirpath, filename)
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            if not data or not isinstance(data, dict):
+                continue
+            record_id = str(data.get("id", "")).upper()
+            if not record_id:
+                continue
+            scoped_key = f"{scope}/{record_id}"
+            records[scoped_key] = {
+                "type": data.get("type", ""),
+                "title": data.get("title", "Untitled Decision"),
+                "context": data.get("context", ""),
+                "tags": (data.get("meta") or {}).get("tags", []),
+                "raw": data,
+            }
+        except Exception as e:
+            print(f"Skipping {file_path}: {e}", file=sys.stderr)
 
-                # Check git-tracked status if enabled
-                if use_git_tracked_only and not _is_git_tracked(file_path, git_tracked_files):
-                    continue
-
-                try:
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        data = yaml.safe_load(f)
-                    if not data or not isinstance(data, dict):
-                        continue
-                    record_id = str(data.get("id", "")).upper()
-                    if not record_id:
-                        continue
-                    scoped_key = f"{scope}/{record_id}"
-                    records[scoped_key] = {
-                        "type": data.get("type", ""),
-                        "title": data.get("title", "Untitled Decision"),
-                        "context": data.get("context", ""),
-                        "tags": (data.get("meta") or {}).get("tags", []),
-                        "raw": data,
-                    }
-                except Exception as e:
-                    print(f"Skipping {file_path}: {e}", file=sys.stderr)
-
+    _records_cache = records
+    _cache_fingerprint = fingerprint
     return records
 
 
@@ -265,6 +294,14 @@ def _validate_single_file(file_path, schema):
     """Validate one YAML file against schema. Returns True if valid."""
     if not file_path.endswith(".yaml"):
         return True
+    try:
+        file_size = os.path.getsize(file_path)
+        if file_size > MAX_YAML_FILE_BYTES:
+            print(f"ERROR: {file_path} — file size {file_size} exceeds {MAX_YAML_FILE_BYTES} bytes limit")
+            return False
+    except OSError as e:
+        print(f"ERROR: {file_path} — could not check file size: {e}")
+        return False
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
