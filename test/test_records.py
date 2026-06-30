@@ -20,14 +20,14 @@ class TestGetAllRecords:
         records = get_all_records()
         assert "./ADR-0001" in records
 
-    def test_all_six_type_dirs_are_discovered(self, tmp_project, write_yaml, minimal_valid_record):
-        for type_dir in ["adr", "ddr", "sdr", "odr", "tdr", "pdr"]:
+    def test_all_seven_type_dirs_are_discovered(self, tmp_project, write_yaml, minimal_valid_record):
+        for type_dir in ["adr", "ddr", "sdr", "odr", "tdr", "pdr", "fdr"]:
             record = minimal_valid_record.copy()
             record["type"] = "architecture"
             record["id"] = f"{type_dir.upper()}-0001"
             write_yaml(f"{type_dir}/{record['id']}.yaml", record)
         records = get_all_records()
-        assert len(records) == 6
+        assert len(records) == 7
 
     def test_non_type_dir_is_ignored(self, tmp_project, write_yaml, minimal_valid_record):
         write_yaml("decisions/ADR-0001.yaml", minimal_valid_record)

@@ -1,0 +1,12 @@
+id: FDR-0001
+type: functional
+title: Define login flow behavior
+date: "2026-06-30"
+status: accepted
+context: We need to specify the login flow for the application.
+decision:
+  chosen_option: Standard OAuth2
+  justification: Industry standard.
+consequences:
+  acceptance_criteria:
+    - Given a valid user, when they log in, then they receive a token.

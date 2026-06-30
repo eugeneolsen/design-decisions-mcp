@@ -1,6 +1,6 @@
 # Design Decision MCP Server
 
-An MCP (Model Context Protocol) server that surfaces Architecture Decision Records (ADRs) and Design Decision Records (DDRs) to AI coding assistants as just-in-time architectural guardrails.  
+An MCP (Model Context Protocol) server that surfaces decision records (ADRs, DDRs, SDRs, ODRs, TDRs, PDRs, FDRs) to AI coding assistants as just-in-time architectural guardrails. Enables Spec-Driven Development (SDD) through Functional Decision Records that capture behavioral specifications.  
 
 More simply stated, this MCP server turns the types of decision records listed below into something very similar to agent Skills.
 
@@ -8,9 +8,11 @@ More simply stated, this MCP server turns the types of decision records listed b
 
 This server acts as an *Architectural Context Oracle*: when an AI assistant is about to write or modify code, it can query this server to discover which architectural decisions are relevant to the task, then fetch the full rules for those decisions. This prevents the assistant from guessing at design intent or violating project-wide standards.
 
+**Spec-Driven Development (SDD):** The server enables SDD workflows through Functional Decision Records (FDRs), which capture behavioral specifications — acceptance criteria, API contracts, and state machines — alongside design rationale. This allows teams to write executable specifications that guide implementation and validation before code is written.
+
 ## Decision Records
 
-Decision records are stored as pure YAML files and **co-located with the code they govern**. Any directory named `adr/`, `ddr/`, `sdr/`, `odr/`, `tdr/`, or `pdr/` anywhere in the project tree is a valid record container.
+Decision records are stored as pure YAML files and **co-located with the code they govern**. Any directory named `adr/`, `ddr/`, `sdr/`, `odr/`, `tdr/`, `pdr/`, or `fdr/` anywhere in the project tree is a valid record container.
 
 | Type | Prefix | Purpose |
 |------|--------|---------|
@@ -20,6 +22,7 @@ Decision records are stored as pure YAML files and **co-located with the code th
 | ODR | `ODR-` | Operations Decision Records — infrastructure and deployment constraints |
 | TDR | `TDR-` | Technical/Product Decision Records — vendor and tool boundaries |
 | PDR | `PDR-` | Process Decision Records — automation and CI/CD standards |
+| FDR | `FDR-` | Functional Decision Records — behavioral specifications and acceptance criteria for Spec-Driven Development |
 
 **Examples:**
 - `docs/adr/ADR-0001-microservices-split.yaml` → scoped ID: `docs/ADR-0001`
@@ -80,7 +83,7 @@ The server exposes two tools to AI clients:
 
 Returns a lightweight registry of all decision records discovered in the project tree. For each record, returns:
 - **Scoped ID** (e.g., `docs/ADR-0001` or `services/billing/DDR-0001`)
-- **Type** (architecture, design, security, operations, product, process)
+- **Type** (architecture, design, security, operations, product, process, functional)
 - **Title**
 - **Context preview** (first 120 characters)
 - **Tags**
@@ -250,7 +253,7 @@ Or validate specific files:
 design-decisions-mcp validate docs/adr/ADR-0001.yaml services/billing/ddr/DDR-0001.yaml
 ```
 
-Exit code `0` means all records passed; exit code `1` reports validation errors. The validator walks the entire project tree searching for `.yaml` files in any `adr/`, `ddr/`, `sdr/`, `odr/`, `tdr/`, or `pdr/` directory.
+Exit code `0` means all records passed; exit code `1` reports validation errors. The validator walks the entire project tree searching for `.yaml` files in any `adr/`, `ddr/`, `sdr/`, `odr/`, `tdr/`, `pdr/`, or `fdr/` directory.
 
 ### CI/CD Setup
 

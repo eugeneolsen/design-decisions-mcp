@@ -11,12 +11,13 @@ DECISION_RECORD_SCHEMA = {
         {"if": {"properties": {"type": {"const": "security"}}}, "then": {"properties": {"id": {"pattern": "^SDR-[0-9]{4}$"}}}},
         {"if": {"properties": {"type": {"const": "product"}}}, "then": {"properties": {"id": {"pattern": "^TDR-[0-9]{4}$"}}}},
         {"if": {"properties": {"type": {"const": "process"}}}, "then": {"properties": {"id": {"pattern": "^PDR-[0-9]{4}$"}}}},
+        {"if": {"properties": {"type": {"const": "functional"}}}, "then": {"properties": {"id": {"pattern": "^FDR-[0-9]{4}$"}, "consequences": {"required": ["acceptance_criteria"]}}}},
     ],
     "properties": {
         "id": {"type": "string", "description": "Unique identifier prefixed by domain type (e.g., ADR-0001, SDR-0022)"},
         "type": {
             "type": "string",
-            "enum": ["architecture", "design", "operations", "security", "product", "process"],
+            "enum": ["architecture", "design", "operations", "security", "product", "process", "functional"],
             "description": "The specific domain category of the decision record.",
         },
         "title": {"type": "string", "minLength": 10, "description": "Clear, descriptive title of the decision."},
@@ -38,6 +39,24 @@ DECISION_RECORD_SCHEMA = {
             "properties": {
                 "chosen_option": {"type": "string"},
                 "justification": {"type": "string"},
+                "api_contract": {
+                    "type": "object",
+                    "description": "Optional HTTP endpoint or JSON schema contract.",
+                },
+                "state_transitions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["from", "event", "to"],
+                        "additionalProperties": False,
+                        "properties": {
+                            "from": {"type": "string"},
+                            "event": {"type": "string"},
+                            "to": {"type": "string"},
+                            "side_effects": {"type": "array", "items": {"type": "string"}},
+                        },
+                    },
+                },
             },
         },
         "consequences": {
@@ -62,6 +81,12 @@ DECISION_RECORD_SCHEMA = {
                             "description": {"type": "string", "minLength": 5, "description": "The textual description of the consequence."},
                         },
                     },
+                },
+                "acceptance_criteria": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"type": "string"},
+                    "description": "Given-When-Then behavioral expectations for functional specs.",
                 },
             },
         },
