@@ -1,6 +1,7 @@
 import json
 import os
 import stat
+import subprocess
 import sys
 import tomllib
 import yaml
@@ -370,11 +371,38 @@ def _init_pre_commit_hook():
         os.chmod(hook_path, os.stat(hook_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         print(f"Created {hook_path}")
 
-    exit_code = os.system("git config core.hooksPath .githooks")
-    if exit_code == 0:
-        print("Configured git to use .githooks (core.hooksPath = .githooks)")
+    # Check if core.hooksPath is already configured
+    result = subprocess.run(
+        ["git", "config", "--get", "core.hooksPath"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    if result.returncode == 0:
+        existing_hooks_path = result.stdout.strip()
+        if existing_hooks_path == ".githooks":
+            print("core.hooksPath is already configured to .githooks")
+        else:
+            print(
+                f"WARNING: core.hooksPath is already set to '{existing_hooks_path}'. "
+                "To use design-decisions-mcp hooks, run manually:\n"
+                "  git config core.hooksPath .githooks",
+                file=sys.stderr,
+            )
     else:
-        print("WARNING: Could not run 'git config core.hooksPath .githooks'. Run it manually.", file=sys.stderr)
+        # core.hooksPath not configured, set it
+        config_result = subprocess.run(
+            ["git", "config", "core.hooksPath", ".githooks"],
+            check=False,
+        )
+        if config_result.returncode == 0:
+            print("Configured git to use .githooks (core.hooksPath = .githooks)")
+        else:
+            print(
+                "WARNING: Could not run 'git config core.hooksPath .githooks'. Run it manually.",
+                file=sys.stderr,
+            )
 
 
 def init_project():
