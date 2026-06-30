@@ -1,0 +1,81 @@
+id: SDR-0001
+type: security
+title: Scope Architecture Record Discovery to Explicit Allowed Directories
+date: "2026-06-30"
+status: proposed
+
+meta:
+  tags:
+    - prompt-injection
+    - threat-model
+    - discovery
+
+context: >
+  The MCP server's get_all_records() function performs an unbounded tree walk
+  starting from the project root, discovering any .yaml file in directories
+  named adr/, ddr/, sdr/, odr/, tdr/, or pdr/, regardless of location. This
+  includes non-hidden third-party trees: vendor/, node_modules/, git submodules,
+  or dependency checkouts containing such directories are all traversed. Once
+  discovered, record content is fed to the AI agent framed as "mandatory
+  implementation rules" and "CONFORMANCE GUARDRAILS." A malicious record
+  injected via a PR, dependency, or submodule becomes instructions the agent is
+  told to obey. With an agent possessing edit, Bash, and network tools, this
+  constitutes an indirect prompt-injection attack surface. Content is never
+  sanitized or length-capped before reaching the model.
+
+decision:
+  chosen_option: >
+    Restrict discovery to an explicit list of allowed root directories
+    (e.g., ./docs and ./src) and exclude known dependency/vendor directories
+    (node_modules, vendor, site-packages, .venv, .git). Make the allowlist
+    configurable so projects can extend it as needed.
+  justification: >
+    Limiting discovery scope removes the untrusted third-party injection vector.
+    Records in the allowlist are presumably subject to the same code review
+    process as the codebase itself, raising the bar for malicious injection.
+    Configurable scope preserves flexibility for monorepos and complex layouts
+    without requiring an unbounded walk.
+
+consequences:
+  enforced_constraints:
+    - "Do NOT walk the entire project tree. Restrict os.walk() to a
+      configured allowlist of root directories."
+    - "Do explicitly skip known vendor/dependency directories
+      (node_modules, vendor, site-packages, .venv, .git, __pycache__) even
+      if they are inside an allowed root."
+    - "Do make the allowed directories configurable (e.g., via a .mcp.json
+      field or environment variable) so teams can adapt to their layout."
+
+  classified_consequences:
+    - impact: good
+      description: >
+        Eliminates the attack surface for injecting malicious records via
+        transitive dependencies or third-party code.
+    - impact: good
+      description: >
+        Records in the allowlist inherit the security properties of the repo's
+        code review process, raising the trust bar.
+    - impact: neutral
+      description: >
+        Teams with scattered decision records across many directories must
+        update their configuration to include those roots. This is a one-time
+        cost per project layout.
+    - impact: neutral
+      description: >
+        If a team uses a non-standard layout (e.g., decisions in a custom
+        subdirectory), they must register it in config rather than having it
+        auto-discovered. This is intentional — explicit is safer than implicit.
+
+implementation_tasks:
+  - "Update get_all_records() and validate_decisions() to accept an optional
+    allowed_roots parameter (default: [docs, src])."
+  - "Add logic to skip vendor/dependency directories even inside allowed roots."
+  - "Update .mcp.json and/or add a configuration field (e.g., mcpConfig in
+    pyproject.toml) to allow per-project customization of allowed roots."
+  - "Update CLI and MCP server entry points to read and pass the configuration."
+  - "Update README.md to document the allowed-roots behavior and how to extend it."
+  - "Add a test case verifying that records in node_modules/ or vendor/ are
+    excluded even if discovered during a walk."
+  - "Update CLAUDE.md to reflect that records are now scoped and document
+    the trust model more explicitly (records are as trusted as the repo's
+    review process)."
