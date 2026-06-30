@@ -7,7 +7,7 @@ from mcp_decisions_llm import (
     _init_github_actions_workflow,
     _init_pre_commit_hook,
     init_project,
-    GITHUB_ACTIONS_WORKFLOW,
+    _make_github_actions_workflow,
     PRE_COMMIT_HOOK,
 )
 
@@ -21,7 +21,7 @@ class TestInitGithubActionsWorkflow:
     def test_workflow_file_content(self, tmp_project):
         _init_github_actions_workflow()
         workflow_path = tmp_project / ".github" / "workflows" / "validate-decisions.yml"
-        assert workflow_path.read_text() == GITHUB_ACTIONS_WORKFLOW
+        assert workflow_path.read_text() == _make_github_actions_workflow()
 
     def test_idempotent_does_not_overwrite(self, tmp_project):
         _init_github_actions_workflow()
@@ -44,21 +44,34 @@ class TestInitGithubActionsWorkflow:
 
 
 class TestInitPreCommitHook:
+    def _mock_subprocess_not_configured(self, mocker):
+        """Mock subprocess.run: core.hooksPath not configured, set succeeds."""
+        def mock_run(cmd, *args, **kwargs):
+            from unittest.mock import MagicMock
+            result = MagicMock()
+            if "--get" in cmd:
+                result.returncode = 1  # not configured
+                result.stdout = ""
+            else:
+                result.returncode = 0  # set succeeds
+            return result
+        return mocker.patch("mcp_decisions_llm.subprocess.run", side_effect=mock_run)
+
     def test_creates_hook_file(self, tmp_project, mocker):
-        mocker.patch("mcp_decisions_llm.os.system", return_value=0)
+        self._mock_subprocess_not_configured(mocker)
         _init_pre_commit_hook()
         hook_path = tmp_project / ".githooks" / "pre-commit"
         assert hook_path.exists()
 
     def test_hook_file_content(self, tmp_project, mocker):
-        mocker.patch("mcp_decisions_llm.os.system", return_value=0)
+        self._mock_subprocess_not_configured(mocker)
         _init_pre_commit_hook()
         hook_path = tmp_project / ".githooks" / "pre-commit"
         assert hook_path.read_text() == PRE_COMMIT_HOOK
 
     @pytest.mark.skipif(os.name == "nt", reason="Windows does not honor Unix execute bits")
     def test_hook_file_is_executable(self, tmp_project, mocker):
-        mocker.patch("mcp_decisions_llm.os.system", return_value=0)
+        self._mock_subprocess_not_configured(mocker)
         _init_pre_commit_hook()
         hook_path = tmp_project / ".githooks" / "pre-commit"
         # Check if executable bit is set
@@ -66,30 +79,67 @@ class TestInitPreCommitHook:
         assert bool(st_mode & stat.S_IXUSR)
 
     def test_calls_git_config(self, tmp_project, mocker):
-        mock_system = mocker.patch("mcp_decisions_llm.os.system", return_value=0)
+        mock_run = self._mock_subprocess_not_configured(mocker)
         _init_pre_commit_hook()
-        mock_system.assert_called_once_with("git config core.hooksPath .githooks")
+        # Should call --get first, then set
+        calls = mock_run.call_args_list
+        assert len(calls) == 2
+        assert "--get" in calls[0][0][0]
+        assert calls[1][0][0] == ["git", "config", "core.hooksPath", ".githooks"]
 
     def test_idempotent_skips_file_creation(self, tmp_project, mocker):
-        mock_system = mocker.patch("mcp_decisions_llm.os.system", return_value=0)
+        mock_run = self._mock_subprocess_not_configured(mocker)
         _init_pre_commit_hook()
         hook_path = tmp_project / ".githooks" / "pre-commit"
         custom_content = "custom"
         hook_path.write_text(custom_content)
-        mock_system.reset_mock()
+        mock_run.reset_mock()
         _init_pre_commit_hook()
         assert hook_path.read_text() == custom_content
-        # git config is still called once per invocation
-        mock_system.assert_called_once()
+        # git config --get is still called
+        mock_run.assert_called()
 
-    def test_git_config_nonzero_prints_warning(self, tmp_project, mocker, capsys):
-        mocker.patch("mcp_decisions_llm.os.system", return_value=1)
+    def test_git_config_get_fails_prints_warning(self, tmp_project, mocker, capsys):
+        """When 'git config --get' fails (e.g., not a git repo), warn."""
+        from unittest.mock import MagicMock
+        result = MagicMock()
+        result.returncode = 128  # git error
+        mocker.patch("mcp_decisions_llm.subprocess.run", return_value=result)
         _init_pre_commit_hook()
         captured = capsys.readouterr()
         assert "WARNING:" in captured.err
 
+    def test_existing_different_hookspath_prints_warning(self, tmp_project, mocker, capsys):
+        """When core.hooksPath is set to something other than .githooks, warn."""
+        from unittest.mock import MagicMock
+        def mock_run(cmd, *args, **kwargs):
+            result = MagicMock()
+            if "--get" in cmd:
+                result.returncode = 0
+                result.stdout = ".husky"
+            return result
+        mocker.patch("mcp_decisions_llm.subprocess.run", side_effect=mock_run)
+        _init_pre_commit_hook()
+        captured = capsys.readouterr()
+        assert "WARNING:" in captured.err
+        assert ".husky" in captured.err
+
+    def test_existing_githooks_hookspath_no_warning(self, tmp_project, mocker, capsys):
+        """When core.hooksPath is already .githooks, no warning."""
+        from unittest.mock import MagicMock
+        def mock_run(cmd, *args, **kwargs):
+            result = MagicMock()
+            if "--get" in cmd:
+                result.returncode = 0
+                result.stdout = ".githooks"
+            return result
+        mocker.patch("mcp_decisions_llm.subprocess.run", side_effect=mock_run)
+        _init_pre_commit_hook()
+        captured = capsys.readouterr()
+        assert "already configured" in captured.out
+
     def test_creates_githooks_dir(self, tmp_project, mocker):
-        mocker.patch("mcp_decisions_llm.os.system", return_value=0)
+        self._mock_subprocess_not_configured(mocker)
         _init_pre_commit_hook()
         assert (tmp_project / ".githooks").exists()
 

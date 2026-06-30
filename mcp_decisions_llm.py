@@ -1,6 +1,7 @@
 import json
 import os
 import stat
+import subprocess
 import sys
 import tomllib
 import yaml
@@ -14,7 +15,11 @@ mcp = FastMCP("Architectural Context Oracle")
 TYPE_DIRS = {"adr", "ddr", "sdr", "odr", "tdr", "pdr"}
 VENDOR_DIRS = {"node_modules", "vendor", "site-packages", ".venv", "venv", "env", ".git", "__pycache__", ".pytest_cache", "dist", "build"}
 
-GITHUB_ACTIONS_WORKFLOW = """\
+
+def _make_github_actions_workflow():
+    """Generate GitHub Actions workflow with pinned versions and commit SHAs."""
+    current_version = _pkg_version("design-decisions-mcp")
+    return f"""\
 name: Architecture Records Conformance Check
 
 on:
@@ -28,13 +33,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938  # v4.2.0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0
 
       - name: Validate Decision Records
-        run: uvx --from git+https://github.com/eugeneolsen/design-decisions-mcp.git design-decisions-mcp validate
+        run: uvx --from git+https://github.com/eugeneolsen/design-decisions-mcp.git@v{current_version} design-decisions-mcp validate
 """
 
 PRE_COMMIT_HOOK = """\
@@ -347,7 +352,7 @@ def _init_github_actions_workflow():
 
     os.makedirs(workflow_dir, exist_ok=True)
     with open(workflow_path, "w", encoding="utf-8", newline="\n") as f:
-        f.write(GITHUB_ACTIONS_WORKFLOW)
+        f.write(_make_github_actions_workflow())
     print(f"Created {workflow_path}")
 
 
@@ -366,11 +371,38 @@ def _init_pre_commit_hook():
         os.chmod(hook_path, os.stat(hook_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         print(f"Created {hook_path}")
 
-    exit_code = os.system("git config core.hooksPath .githooks")
-    if exit_code == 0:
-        print("Configured git to use .githooks (core.hooksPath = .githooks)")
+    # Check if core.hooksPath is already configured
+    result = subprocess.run(
+        ["git", "config", "--get", "core.hooksPath"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    if result.returncode == 0:
+        existing_hooks_path = result.stdout.strip()
+        if existing_hooks_path == ".githooks":
+            print("core.hooksPath is already configured to .githooks")
+        else:
+            print(
+                f"WARNING: core.hooksPath is already set to '{existing_hooks_path}'. "
+                "To use design-decisions-mcp hooks, run manually:\n"
+                "  git config core.hooksPath .githooks",
+                file=sys.stderr,
+            )
     else:
-        print("WARNING: Could not run 'git config core.hooksPath .githooks'. Run it manually.", file=sys.stderr)
+        # core.hooksPath not configured, set it
+        config_result = subprocess.run(
+            ["git", "config", "core.hooksPath", ".githooks"],
+            check=False,
+        )
+        if config_result.returncode == 0:
+            print("Configured git to use .githooks (core.hooksPath = .githooks)")
+        else:
+            print(
+                "WARNING: Could not run 'git config core.hooksPath .githooks'. Run it manually.",
+                file=sys.stderr,
+            )
 
 
 def init_project():

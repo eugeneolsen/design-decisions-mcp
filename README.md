@@ -164,10 +164,18 @@ design-decisions-mcp init
 
 This will set up:
 1. **`CLAUDE.md`** — Engineering Conformance Protocol for the project's AI assistant
-2. **`.github/workflows/validate-decisions.yml`** — Automatic validation on every push and pull request
-3. **`.githooks/pre-commit`** — Automatic validation before every commit (after running `git config core.hooksPath .githooks`)
+2. **`.github/workflows/validate-decisions.yml`** — Automatic validation on every push and pull request (with pinned action versions)
+3. **`.githooks/pre-commit`** — Automatic validation before every commit
 
-All setup is idempotent; it's safe to re-run `init` at any time.
+**Hook Configuration Safety:** The init command detects and respects existing `core.hooksPath` configurations:
+- If `core.hooksPath` is not set, it will be configured to use `.githooks`
+- If `core.hooksPath` is already set to `.githooks`, the setup is skipped (already correct)
+- If `core.hooksPath` is set to a different directory (e.g., `.husky`, `lefthook`), a warning is printed and the existing configuration is preserved. You must manually switch if desired:
+  ```bash
+  git config core.hooksPath .githooks
+  ```
+
+All setup is idempotent; it's safe to re-run `init` at any time. Existing developer hook setups are never silently clobbered.
 
 ### Development/Local Setup
 
@@ -246,13 +254,29 @@ Exit code `0` means all records passed; exit code `1` reports validation errors.
 
 ### CI/CD Setup
 
-The `design-decisions-mcp init` command automatically creates `.github/workflows/validate-decisions.yml`, which runs on every push and pull request. The workflow uses `uvx` to fetch and run the latest version of the validator:
+The `design-decisions-mcp init` command automatically creates `.github/workflows/validate-decisions.yml`, which runs on every push and pull request. 
 
+**Security:** The generated workflow is hardened against supply-chain attacks:
+
+- **GitHub Actions pinned to commit SHAs** — not mutable major-version tags
+  - `actions/checkout` pinned to a specific commit
+  - `astral-sh/setup-uv` pinned to a specific commit
+  - Comments indicate which version (e.g., `# v4.2.0`)
+
+- **Tool version pinned** — the `uvx --from` command includes `@v{version}`, not `@main`
+  - Teams running `init` with v0.1.0 installed get `@v0.1.0` pinned
+  - No automatic upgrades; teams control when to update
+  - Protects against compromised `main` branch
+
+Example generated workflow:
 ```yaml
-run: uvx --from git+https://github.com/eugeneolsen/design-decisions-mcp.git design-decisions-mcp validate
+uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938  # v4.2.0
+uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6.8.0
+
+run: uvx --from git+https://github.com/eugeneolsen/design-decisions-mcp.git@v0.1.0 design-decisions-mcp validate
 ```
 
-This ensures validation works even for projects that don't have the tool installed permanently.
+This ensures validation works even for projects that don't have the tool installed permanently, while maintaining supply-chain security through pinned versions.
 
 ## License
 
