@@ -12,7 +12,7 @@ from design_decision_schema import DECISION_RECORD_SCHEMA
 
 mcp = FastMCP("Architectural Context Oracle")
 
-TYPE_DIRS = {"adr", "ddr", "sdr", "odr", "tdr", "pdr"}
+TYPE_DIRS = {"adr", "ddr", "sdr", "odr", "tdr", "pdr", "fdr"}
 VENDOR_DIRS = {"node_modules", "vendor", "site-packages", ".venv", "venv", "env", ".git", "__pycache__", ".pytest_cache", "dist", "build"}
 MAX_YAML_FILE_BYTES = 5 * 1024 * 1024  # 5 MB
 
@@ -248,7 +248,7 @@ def list_architecture_decisions() -> str:
     """
     records = get_all_records()
     if not records:
-        return "No decision records found. Place .yaml files in any adr/, ddr/, sdr/, odr/, tdr/, or pdr/ directory."
+        return "No decision records found. Place .yaml files in any adr/, ddr/, sdr/, odr/, tdr/, pdr/, or fdr/ directory."
 
     output = ["=== ARCHITECTURAL REGISTRY ==="]
     for scoped_key, data in sorted(records.items()):

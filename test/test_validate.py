@@ -166,3 +166,127 @@ class TestValidateDecisions:
         validate_decisions()
         captured = capsys.readouterr()
         assert "Validation failed" in captured.out
+
+
+class TestFdrValidation:
+    def test_valid_fdr_passes(self, tmp_path):
+        fdr = tmp_path / "FDR-0001.yaml"
+        fdr.write_text(
+            yaml.dump(
+                {
+                    "id": "FDR-0001",
+                    "type": "functional",
+                    "title": "Define login flow behavior",
+                    "date": "2026-06-30",
+                    "status": "accepted",
+                    "context": "We need to specify the login flow for the application.",
+                    "decision": {"chosen_option": "Standard OAuth2", "justification": "Industry standard."},
+                    "consequences": {
+                        "acceptance_criteria": ["Given a valid user, when they log in, then they receive a token."]
+                    },
+                }
+            )
+        )
+        assert _validate_single_file(str(fdr), DECISION_RECORD_SCHEMA) is True
+
+    def test_fdr_missing_acceptance_criteria_fails(self, tmp_path, capsys):
+        fdr = tmp_path / "FDR-0001.yaml"
+        fdr.write_text(
+            yaml.dump(
+                {
+                    "id": "FDR-0001",
+                    "type": "functional",
+                    "title": "Define login flow behavior",
+                    "date": "2026-06-30",
+                    "status": "accepted",
+                    "context": "We need to specify the login flow for the application.",
+                    "decision": {"chosen_option": "Standard OAuth2", "justification": "Industry standard."},
+                    "consequences": {"enforced_constraints": ["Do implement OAuth2."]},
+                }
+            )
+        )
+        assert _validate_single_file(str(fdr), DECISION_RECORD_SCHEMA) is False
+        captured = capsys.readouterr()
+        assert "ERROR" in captured.out
+
+    def test_fdr_wrong_id_prefix_fails(self, tmp_path, capsys):
+        fdr = tmp_path / "ADR-0001.yaml"
+        fdr.write_text(
+            yaml.dump(
+                {
+                    "id": "ADR-0001",
+                    "type": "functional",
+                    "title": "Define login flow behavior",
+                    "date": "2026-06-30",
+                    "status": "accepted",
+                    "context": "We need to specify the login flow for the application.",
+                    "decision": {"chosen_option": "Standard OAuth2", "justification": "Industry standard."},
+                    "consequences": {
+                        "acceptance_criteria": ["Given a valid user, when they log in, then they receive a token."]
+                    },
+                }
+            )
+        )
+        assert _validate_single_file(str(fdr), DECISION_RECORD_SCHEMA) is False
+        captured = capsys.readouterr()
+        assert "ERROR" in captured.out
+
+    def test_fdr_with_state_transitions_passes(self, tmp_path):
+        fdr = tmp_path / "FDR-0001.yaml"
+        fdr.write_text(
+            yaml.dump(
+                {
+                    "id": "FDR-0001",
+                    "type": "functional",
+                    "title": "Define checkout state machine",
+                    "date": "2026-06-30",
+                    "status": "accepted",
+                    "context": "We need to specify the checkout state transitions.",
+                    "decision": {
+                        "chosen_option": "State machine approach",
+                        "justification": "Ensures valid order flows.",
+                        "state_transitions": [
+                            {
+                                "from": "cart",
+                                "event": "checkout_initiated",
+                                "to": "payment",
+                                "side_effects": ["email_confirmation_sent"],
+                            },
+                            {"from": "payment", "event": "payment_success", "to": "complete"},
+                        ],
+                    },
+                    "consequences": {
+                        "acceptance_criteria": ["Given items in cart, when checkout is initiated, then user enters payment state."]
+                    },
+                }
+            )
+        )
+        assert _validate_single_file(str(fdr), DECISION_RECORD_SCHEMA) is True
+
+    def test_fdr_with_api_contract_passes(self, tmp_path):
+        fdr = tmp_path / "FDR-0001.yaml"
+        fdr.write_text(
+            yaml.dump(
+                {
+                    "id": "FDR-0001",
+                    "type": "functional",
+                    "title": "Define authentication API contract",
+                    "date": "2026-06-30",
+                    "status": "accepted",
+                    "context": "We need to specify the authentication API contract.",
+                    "decision": {
+                        "chosen_option": "REST API with JWT",
+                        "justification": "Stateless and scalable.",
+                        "api_contract": {
+                            "endpoint": "POST /auth/login",
+                            "request": {"email": "string", "password": "string"},
+                            "response": {"token": "string", "expires_in": "number"},
+                        },
+                    },
+                    "consequences": {
+                        "acceptance_criteria": ["Given valid credentials, when user calls POST /auth/login, then they receive a JWT token."]
+                    },
+                }
+            )
+        )
+        assert _validate_single_file(str(fdr), DECISION_RECORD_SCHEMA) is True
