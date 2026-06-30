@@ -164,10 +164,18 @@ design-decisions-mcp init
 
 This will set up:
 1. **`CLAUDE.md`** — Engineering Conformance Protocol for the project's AI assistant
-2. **`.github/workflows/validate-decisions.yml`** — Automatic validation on every push and pull request
-3. **`.githooks/pre-commit`** — Automatic validation before every commit (after running `git config core.hooksPath .githooks`)
+2. **`.github/workflows/validate-decisions.yml`** — Automatic validation on every push and pull request (with pinned action versions)
+3. **`.githooks/pre-commit`** — Automatic validation before every commit
 
-All setup is idempotent; it's safe to re-run `init` at any time.
+**Hook Configuration Safety:** The init command detects and respects existing `core.hooksPath` configurations:
+- If `core.hooksPath` is not set, it will be configured to use `.githooks`
+- If `core.hooksPath` is already set to `.githooks`, the setup is skipped (already correct)
+- If `core.hooksPath` is set to a different directory (e.g., `.husky`, `lefthook`), a warning is printed and the existing configuration is preserved. You must manually switch if desired:
+  ```bash
+  git config core.hooksPath .githooks
+  ```
+
+All setup is idempotent; it's safe to re-run `init` at any time. Existing developer hook setups are never silently clobbered.
 
 ### Development/Local Setup
 
