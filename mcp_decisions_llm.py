@@ -12,7 +12,7 @@ from design_decision_schema import DECISION_RECORD_SCHEMA
 mcp = FastMCP("Architectural Context Oracle")
 
 TYPE_DIRS = {"adr", "ddr", "sdr", "odr", "tdr", "pdr"}
-VENDOR_DIRS = {"node_modules", "vendor", "site-packages", ".venv", ".git", "__pycache__", ".pytest_cache", "dist", "build"}
+VENDOR_DIRS = {"node_modules", "vendor", "site-packages", ".venv", "venv", "env", ".git", "__pycache__", ".pytest_cache", "dist", "build"}
 
 GITHUB_ACTIONS_WORKFLOW = """\
 name: Architecture Records Conformance Check
