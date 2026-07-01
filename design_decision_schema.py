@@ -24,7 +24,7 @@ DECISION_RECORD_SCHEMA = {
         "date": {"type": "string", "format": "date", "description": "The date the record was created or updated (YYYY-MM-DD)."},
         "status": {
             "type": "string",
-            "enum": ["proposed", "accepted", "rejected", "deprecated", "superseded"],
+            "enum": ["proposed", "accepted", "implemented", "rejected", "deprecated", "superseded"],
             "description": "The current lifecycle state of the decision.",
         },
         "supersedes": {"type": "string", "pattern": "^[A-Z]{3}-[0-9]{4}$", "description": "The ID of an earlier record that this new decision replaces."},
