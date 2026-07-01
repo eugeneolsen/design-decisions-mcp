@@ -8,7 +8,7 @@ More simply stated, this MCP server turns the types of decision records listed b
 
 This server acts as an *Architectural Context Oracle*: when an AI assistant is about to write or modify code, it can query this server to discover which architectural decisions are relevant to the task, then fetch the full rules for those decisions. This prevents the assistant from guessing at design intent or violating project-wide standards.
 
-**Spec-Driven Development (SDD):** The server enables SDD workflows through Functional Decision Records (FDRs), which capture behavioral specifications — acceptance criteria, API contracts, and state machines — alongside design rationale. This allows teams to write executable specifications that guide implementation and validation before code is written.
+**Spec-Driven Development (SDD):** The server enables SDD workflows through Functional Decision Records (FDRs), which capture behavioral specifications — acceptance criteria, API contracts, and state machines — alongside design rationale. This allows teams to write executable specifications that guide implementation and validation before code is written. See [SDD Workflow Guide](docs/sdd-workflow.md) for a step-by-step guide to standing up SDD in your project.
 
 ## Decision Records
 
